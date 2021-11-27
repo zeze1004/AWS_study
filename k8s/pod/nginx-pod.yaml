@@ -18,7 +18,7 @@ spec:
     - containerPort: 80
       protocol: TCP
   
-   - name: ubuntu-sidecar-container
+  - name: ubuntu-sidecar-container
     image: alicek106/rr-test:curl
     command: ["tail"]
     args: ["-f", "/dev/null"] # 컨테이너가 종료되지 않도록 유지합니다.
