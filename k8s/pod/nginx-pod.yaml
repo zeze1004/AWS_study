@@ -1,8 +1,19 @@
+# apiVersion: yaml 파일에서 정의한 오브젝트 api 버전
+# 오브젝트 종류와 개발 성숙도에 따라 설정값이 바뀔 수 있음
 apiVersion: v1
+# kind: 해당 리소싀 종류
 kind: Pod
+# metadata: 리소스들의 정보 기입
 metadata:
-  name: my-nginx-container
-  image: nginx:latest
-  ports:
-  - containerPort: 80
-  protocol: TCP
+  name: my-nginx-pod              # 해당 포드의 고유 이름
+# spec: 리소스를 생성하기 위해 자세한 정보 기입
+spec:
+  # 포드에서 실행될 컨테이너 정보 정의
+  containers:
+  - name: my-nginx-container    # 해당 컨테이너의 이름
+    # 컨테이너 하위 항목인 image에서 사용할 도커 이미지 지정
+    image: nginx:latest
+   # 컨테이너가 사용할 포트
+    ports:
+    - containerPort: 80
+      protocol: TCP
