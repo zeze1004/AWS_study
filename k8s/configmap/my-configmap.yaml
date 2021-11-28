@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  mykey: myvalue--dry-run
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2021-11-28T12:32:30Z"
+  name: my-configmap
+  namespace: default
+  resourceVersion: "674497"
+  uid: f4bf2157-5bb3-454e-9916-8ac3ea6c5c3f
