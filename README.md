@@ -2,7 +2,7 @@
 사용은 [제제의 기술블로그](https://blog.naver.com/PostList.naver?blogId=thwjd2717&from=postList&categoryNo=55#)에 기록했습니다 놀러오세요👻
 
 AWS 시리즈
-[누누씨와함께해_AWS](https://blog.naver.com/thwjd2717/222241411042)
-
+[AWS_lambda+S3](https://blog.naver.com/thwjd2717/222241411042)
+[AWS_CI/CD](https://blog.naver.com/thwjd2717/222273538247)
 k8s 시리즈
-[시작하세요!_쿠버네티스](https://blog.naver.com/thwjd2717/222580176779)
+[쿠버네티스 정리 1편부텅 정주행 시작하기!](https://blog.naver.com/thwjd2717/222580176779)
