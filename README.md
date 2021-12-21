@@ -11,6 +11,8 @@
 
 [AWS_CI/CD 사용하기](https://blog.naver.com/thwjd2717/222273538247)
 
+[AWS 장애 대응 고민하기](https://blog.naver.com/thwjd2717/222598255464)
+
 
 ### k8s 시리즈
 
