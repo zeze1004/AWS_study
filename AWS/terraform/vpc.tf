@@ -32,3 +32,12 @@ resource "aws_subnet" "private_subnet" {
 	}
   
 }
+
+# 인터넷 게이트웨이
+resource "aws_internet_gateway" "igw" {
+	vpc_id = aws_vpc.main.id
+
+	tags = {
+	  Name = "main"
+	}
+}
