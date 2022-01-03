@@ -41,3 +41,24 @@ resource "aws_internet_gateway" "igw" {
 	  Name = "main"
 	}
 }
+
+# NAT 게이트웨이
+resource "aws_eip" "nat" {
+	vpc = true
+
+	lifecycle {
+		create_before_destroy = true
+	}
+}
+
+# eip(엘라스틱 IP)
+resource "aws_nat_gateway" "nat_gateway" {
+	allocation_id = aws_eip.nat.id
+	
+	# priviate subnet이 아닌 public subnet을 연결해야 함
+	subnet_id = aws_subnet.public_subnet.id
+
+	tags = {
+		Name = "NAT-GW-1"
+	}
+}
