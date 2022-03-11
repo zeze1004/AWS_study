@@ -7,7 +7,7 @@ Identity and Access Management
 - aws 계정 생성하면 default로 생성되는 root user
 
 
-## user를 group에 추가하는 법
+### user를 group에 추가하는 법
 - group 생성
 	- 권한 설정
 - 생성한 group에 user 추가하면 됨
@@ -31,7 +31,25 @@ Identity and Access Management
 
 
 ## IAM Policies Structure
-
+```json
+{
+	"Version": "2012-10-17", 			
+	"Id": "s3 account permissions", // 정책 ID(optional)
+	"Statement": [
+		{
+			"Sid":  "1", 			  				// statement 식별자(정책 문서 ID): A-Z, a-z, 0-9 중 하나만
+			"Effect": "Allow", 				  //  statement의 접속 권한 명시(Allow, Deny)
+			"Principal": {						 // account/user/role이 어느 정책에 적용되는지 명시 
+				"AWS": ["arn:aws:iam::12345678(account ID):root"]
+		},
+		"Action": [								 // Effect가 적용되는 목록
+			"s3:helloworld"
+		],
+		"Resource": ["arn:aws:s3:::zezebucket/*"]
+		}
+	]
+}
+```
 
 
 
