@@ -27,8 +27,10 @@ Identity and Access Management
 
 ## IAM Policies inheritance
 정책 상속
-- 두 그룹에 속한 한 유저는 두 그룹의 권한을 상속 받음
 
+<p align = "center"><img src="../../images/IAM_group.jpg"></img></p>
+
+- 두 그룹에 속한 한 유저는 두 그룹의 권한을 상속 받음
 
 ## IAM Policies Structure
 ```json
