@@ -1,0 +1,905 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Builders Compute 200 Lv HoL Prerequisite - Network CloudFormation Template'
+Mappings:
+  CidrMappings:
+    private-subnet-1: {CIDR: 10.0.3.0/24}
+    private-subnet-2: {CIDR: 10.0.4.0/24}
+    public-subnet-1: {CIDR: 10.0.1.0/24}
+    public-subnet-2: {CIDR: 10.0.2.0/24}
+    vpc: {CIDR: 10.0.0.0/16}
+  DomainNameMappings:
+    eu-west-1: {Domain: eu-west-1.compute.internal}
+    us-east-1: {Domain: ec2.internal}
+    us-east-2: {Domain: us-east-2.compute.internal}
+    us-west-2: {Domain: us-west-2.compute.internal}
+    ap-northeast-1: {Domain: ap-northeast-1.compute.internal}
+    ap-northeast-2: {Domain: ap-northeast-2.compute.internal}
+Outputs:
+  PrivateSubnet1:
+    Description: The first private subnet.
+    Value: {Ref: PrivateSubnet1}
+  PrivateSubnet2:
+    Description: The second private subnet.
+    Value: {Ref: PrivateSubnet2}
+  PublicSubnet1:
+    Description: The first public subnet.
+    Value: {Ref: PublicSubnet1}
+  PublicSubnet2:
+    Description: The second public subnet.
+    Value: {Ref: PublicSubnet2}
+  VPC:
+    Description: The VPC Id.
+    Value: {Ref: VPC}
+  VpcCidr:
+    Description: The CIDR block of the VPC.
+    Value:
+      Fn::FindInMap: [CidrMappings, vpc, CIDR]
+# Parameters: 
+#   myKeyPair: 
+#     Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+#     Type: "AWS::EC2::KeyPair::KeyName"
+Resources:
+  AttachGateway:
+    DependsOn: [VPC, InternetGateway]
+    Properties:
+      InternetGatewayId: {Ref: InternetGateway}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::VPCGatewayAttachment
+  DHCPOptions:
+    Properties:
+      DomainName:
+        Fn::FindInMap:
+        - DomainNameMappings
+        - {Ref: 'AWS::Region'}
+        - Domain
+      DomainNameServers: [AmazonProvidedDNS]
+    Type: AWS::EC2::DHCPOptions
+  EIP:
+    Properties: {Domain: vpc}
+    Type: AWS::EC2::EIP
+  InternetGateway: {DependsOn: VPC, Type: 'AWS::EC2::InternetGateway'}
+  NAT:
+    DependsOn: AttachGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt: [EIP, AllocationId]
+      SubnetId: {Ref: PublicSubnet1}
+    Type: AWS::EC2::NatGateway
+  PrivateRoute:
+    DependsOn: [PrivateRouteTable, NAT]
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: {Ref: NAT}
+      RouteTableId: {Ref: PrivateRouteTable}
+    Type: AWS::EC2::Route
+  PrivateRouteTable:
+    DependsOn: [VPC, AttachGateway]
+    Properties:
+      Tags:
+      - {Key: Name, Value: PrivateRouteTable}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::RouteTable
+  PrivateSubnet1:
+    DependsOn: AttachGateway
+    Properties:
+      AvailabilityZone: 'ap-northeast-2a'   ## using AZ a and c only, because, AZ b does not support t type instance
+        # Fn::Select:
+        # - '0'
+        # - {'Fn::GetAZs': ''}
+      CidrBlock:
+        Fn::FindInMap: [CidrMappings, private-subnet-1, CIDR]
+      Tags:
+      - {Key: Name, Value: PrivateSubnet1}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::Subnet
+  PrivateSubnet1RouteTableAssociation:
+    DependsOn: [PrivateRouteTable, PrivateSubnet1]
+    Properties:
+      RouteTableId: {Ref: PrivateRouteTable}
+      SubnetId: {Ref: PrivateSubnet1}
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  PrivateSubnet2:
+    DependsOn: AttachGateway
+    Properties:
+      AvailabilityZone: 'ap-northeast-2c'
+        # Fn::Select:
+        # - '1'
+        # - {'Fn::GetAZs': ''}
+      CidrBlock:
+        Fn::FindInMap: [CidrMappings, private-subnet-2, CIDR]
+      Tags:
+      - {Key: Name, Value: PrivateSubnet2}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::Subnet
+  PrivateSubnet2RouteTableAssociation:
+    DependsOn: [PrivateRouteTable, PrivateSubnet2]
+    Properties:
+      RouteTableId: {Ref: PrivateRouteTable}
+      SubnetId: {Ref: PrivateSubnet2}
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  PublicRoute:
+    DependsOn: [PublicRouteTable, AttachGateway]
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: {Ref: InternetGateway}
+      RouteTableId: {Ref: PublicRouteTable}
+    Type: AWS::EC2::Route
+  PublicRouteTable:
+    DependsOn: [VPC, AttachGateway]
+    Properties:
+      Tags:
+      - {Key: Name, Value: PublicRouteTable}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::RouteTable
+  PublicSubnet1:
+    DependsOn: AttachGateway
+    Properties:
+      AvailabilityZone: 'ap-northeast-2a' 
+        # Fn::Select:
+        # - '0'
+        # - {'Fn::GetAZs': ''}
+      CidrBlock:
+        Fn::FindInMap: [CidrMappings, public-subnet-1, CIDR]
+      Tags:
+      - {Key: Name, Value: PublicSubnet1}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::Subnet
+  PublicSubnet1RouteTableAssociation:
+    DependsOn: [PublicRouteTable, PublicSubnet1, AttachGateway]
+    Properties:
+      RouteTableId: {Ref: PublicRouteTable}
+      SubnetId: {Ref: PublicSubnet1}
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  PublicSubnet2:
+    DependsOn: AttachGateway
+    Properties:
+      AvailabilityZone: 'ap-northeast-2c'
+        # Fn::Select:
+        # - '1'
+        # - {'Fn::GetAZs': ''}
+      CidrBlock:
+        Fn::FindInMap: [CidrMappings, public-subnet-2, CIDR]
+      Tags:
+      - {Key: Name, Value: PublicSubnet2}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::Subnet
+  PublicSubnet2RouteTableAssociation:
+    DependsOn: [PublicRouteTable, PublicSubnet2, AttachGateway]
+    Properties:
+      RouteTableId: {Ref: PublicRouteTable}
+      SubnetId: {Ref: PublicSubnet2}
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  VPC:
+    Properties:
+      CidrBlock:
+        Fn::FindInMap: [CidrMappings, vpc, CIDR]
+      EnableDnsHostnames: 'true'
+      EnableDnsSupport: 'true'
+      Tags:
+      - {Key: Name, Value: BuildersVPC}
+    Type: AWS::EC2::VPC
+  VPCDHCPOptionsAssociation:
+    Properties:
+      DhcpOptionsId: {Ref: DHCPOptions}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+  
+  # WorkstationSG:  
+  #   Type: "AWS::EC2::SecurityGroup"
+  #   Properties:
+  #       GroupName: Workstation to Push images
+  #       GroupDescription: EC2 SecurityGroup
+  #       VpcId: {Ref: VPC}
+  #       SecurityGroupIngress:
+  #         - IpProtocol: tcp
+  #           FromPort: '22'
+  #           ToPort: '22'
+  #           CidrIp: '0.0.0.0/0'
+  PublicLBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Enable HTTP to the load balancer
+      VpcId: {Ref: VPC}
+      Tags:
+      - {Key: Name, Value: PublicLBSG}
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: '0.0.0.0/0'
+
+  FrontEndSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allow trafic from PublicLB
+      VpcId: {Ref: VPC}
+      Tags:
+      - {Key: Name, Value: FrontEndSG}
+      SecurityGroupIngress:
+      - SourceSecurityGroupId: {Ref: PublicLBSecurityGroup} 
+        IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+
+  InternalLBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allow trafic from FrontEnd
+      VpcId: {Ref: VPC}
+      Tags:
+      - {Key: Name, Value: InternalLBSG}
+      SecurityGroupIngress:
+      - SourceSecurityGroupId: {Ref: FrontEndSecurityGroup} 
+        IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+
+  BackEndSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allow trafic from IntenalLB
+      VpcId: {Ref: VPC}
+      Tags:
+      - {Key: Name, Value: BackEndSG}
+      SecurityGroupIngress:
+      - SourceSecurityGroupId: {Ref: InternalLBSecurityGroup} 
+        IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+      Path: "/"
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref EC2InstanceRole
+      InstanceProfileName: builders-ec2-profile-cf
+  
+  FrontendALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: PublicLBSecurityGroup
+    Properties:
+      Name: Builders-FrontendALB
+      Scheme: internet-facing
+      SecurityGroups:
+      - !Ref PublicLBSecurityGroup 
+      Subnets:
+      - !Ref PublicSubnet1
+      - !Ref PublicSubnet2
+
+  FrontendALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: 200
+      Name: FrontendALBTargetGroup
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC
+  
+  FrontendALBListner:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+    - FrontendALB 
+    - FrontendALBTargetGroup
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref FrontendALBTargetGroup 
+      LoadBalancerArn: !Ref FrontendALB
+      Port: 80
+      Protocol: HTTP 
+
+  BkCatALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: InternalLBSecurityGroup 
+    Properties:
+      Name: Builders-CatALB
+      Scheme: internal
+      SecurityGroups:
+      - !Ref InternalLBSecurityGroup 
+      Subnets:
+      - !Ref PrivateSubnet1 
+      - !Ref PrivateSubnet2
+
+  BkCatALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: 200
+      Name: BkCatALBTargetGroup
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC
+
+  BkCatALBListner:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+    - BkCatALB 
+    - BkCatALBTargetGroup
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref BkCatALBTargetGroup 
+      LoadBalancerArn: !Ref BkCatALB
+      Port: 80
+      Protocol: HTTP 
+
+  BkDogALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: InternalLBSecurityGroup 
+    Properties:
+      Name: Builders-DogALB
+      Scheme: internal
+      SecurityGroups:
+      - !Ref InternalLBSecurityGroup 
+      Subnets:
+      - !Ref PrivateSubnet1 
+      - !Ref PrivateSubnet2
+
+  BkDogALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: 200
+      Name: BkDogALBTargetGroup
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC
+
+  BkDogALBListner:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+    - BkDogALB 
+    - BkDogALBTargetGroup
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref BkDogALBTargetGroup 
+      LoadBalancerArn: !Ref BkDogALB
+      Port: 80
+      Protocol: HTTP 
+  
+  FrontendLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn: FrontEndSecurityGroup 
+    Properties:
+      LaunchTemplateName: BuildersFrontend
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            DeleteOnTermination: 'true'
+            VolumeSize: 8
+            VolumeType: gp3
+        IamInstanceProfile: 
+          Name: !Ref EC2InstanceProfile 
+        ImageId: ami-033a6a056910d1137  # Amazon Linux2, Kernel 5, HVM, x86-64, latest at 2022 Mar.
+        InstanceType: t3.micro
+        SecurityGroupIds:
+        - !Ref FrontEndSecurityGroup 
+        TagSpecifications:
+        - ResourceType: instance
+          Tags:
+          - Key: Name
+            Value: Builders-Frontend
+          - Key: service_name
+            Value: frontend
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -e
+            echo 'get temporary token for metedata'
+            TOKEN=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+            echo ''
+            echo '>> Get Region ....'
+            export REGION=`curl -s -H "X-aws-ec2-metadata-token: $TOKEN"  http://169.254.169.254/latest/dynamic/instance-identity/document/ | grep region | cut -d \" -f 4`
+            echo $REGION && echo ''
+            echo '>> Get instance id ....'
+            INSTANCE_ID=`curl -s -H "X-aws-ec2-metadata-token: $TOKEN"  http://169.254.169.254/latest/dynamic/instance-identity/document/ | grep instanceId | cut -d \" -f 4`
+            echo $INSTANCE_ID && echo ''
+            REPO='https://github.com/John1Q84/pub_playground.git'
+            # curl http://169.254.169.254/latest/dynamic/instance-identity/document | grep availabilityZone | cut -d \" -f 4 | sed 's/.$//'
+            main() {
+                if [ $(id -u) -ne 0 ]; then
+                    echo "Run script as root!" >&2
+                    exit 1
+                fi
+
+                if [ ! -d "/opt/builders" ] ; then
+                    mkdir /opt/builders
+                fi
+
+                export HOME_DIR="/opt/builders"
+                sleep=0
+                while true; do
+                    get_tags &&
+                    git_init &&
+                    config_set &&
+                    make_service &&
+                    break
+                done
+                echo 'initializing complete !!'
+                exit 0
+            }
+            
+            get_tags() {
+                echo 'Get tags' 
+                query="Reservations[*].Instances[*].[Tags[?Key=='service_name'].Value | [0]]"
+                export service_name=`aws ec2 describe-instances --instance-id $INSTANCE_ID --region $REGION --query "$query" --out text`
+                echo 'Tag name "service_name" is,' && echo "$service_name"
+            }
+            
+            git_init(){
+                echo '>> git init step'
+                yum install git -y
+                cd $HOME_DIR
+                if [ -d $HOME_DIR/builders_pkg ] ; then
+                    echo 'remove old git info'
+                    rm -rf $HOME_DIR/builders_pkg
+                fi
+                git init builders_pkg
+                cd builders_pkg
+                git config core.sparseCheckout true
+                git remote add -f origin $REPO
+                echo "python_app/$service_name" > .git/info/sparse-checkout
+                git pull origin main
+                echo '>> end git init'
+            }
+            
+            config_set(){
+               echo '>>config set step'
+               if [ ! -d $HOME_DIR/builders_pkg/python_app/$service_name ] ; then
+                    echo "git init failed"
+                    exit 1
+                fi
+            
+                cd $HOME_DIR/builders_pkg/python_app/$service_name
+                echo '>>working directory is,' && echo `pwd`
+                cat configs.json.tpl | sed "s/REGION_CODE/$REGION/g" > configs.json
+                echo '>> configs.json file ....'
+                cat configs.json
+                echo 'end config set step'
+            }
+
+            make_service(){
+                if [ ! -d $HOME_DIR/builders_pkg/python_app/$service_name ] ; then
+                    echo "git init failed"
+                    exit 1
+                fi
+            
+                cd $HOME_DIR
+                service_file=$HOME_DIR/buildersApp.service.tpl
+                echo '[Unit]' > $service_file
+                echo 'Description=Builders Micro Service' >> $service_file
+                echo -e '\n' >> $service_file
+                echo '[Service]' >> $service_file
+                echo "ExecStart=$HOME_DIR/builders_pkg/python_app/$service_name/start.sh" >> $service_file
+                echo "WorkingDirectory=$HOME_DIR/builders_pkg/python_app/$service_name" >> $service_file
+                echo -e '\n' >> $service_file
+                echo '[Install]' >> $service_file
+                echo 'WantedBy=multi-user.target' >> $service_file
+                
+                echo 'Qualification...'
+                cat $service_file
+            
+                cp $service_file /etc/systemd/system/buildersApp.service
+                systemctl daemon-reload
+                systemctl enable buildersApp
+                systemctl start buildersApp
+            
+            }
+            
+            main
+  
+  BkCatLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn: FrontEndSecurityGroup 
+    Properties:
+      LaunchTemplateName: BuildersBackendCat
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            DeleteOnTermination: 'true'
+            VolumeSize: 8
+            VolumeType: gp3
+        IamInstanceProfile: 
+          Name: !Ref EC2InstanceProfile 
+        ImageId: ami-033a6a056910d1137 
+        InstanceType: t3.micro
+        SecurityGroupIds:
+        - !Ref BackEndSecurityGroup 
+        TagSpecifications:
+        - ResourceType: instance
+          Tags:
+          - Key: Name
+            Value: Builders-Backend-Cat
+          - Key: service_name
+            Value: cats
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -e
+            echo 'get temporary token for metedata'
+            TOKEN=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+            echo ''
+            echo '>> Get Region ....'
+            export REGION=`curl -s -H "X-aws-ec2-metadata-token: $TOKEN"  http://169.254.169.254/latest/dynamic/instance-identity/document/ | grep region | cut -d \" -f 4`
+            echo $REGION && echo ''
+            echo '>> Get instance id ....'
+            INSTANCE_ID=`curl -s -H "X-aws-ec2-metadata-token: $TOKEN"  http://169.254.169.254/latest/dynamic/instance-identity/document/ | grep instanceId | cut -d \" -f 4`
+            echo $INSTANCE_ID && echo ''
+            REPO='https://github.com/John1Q84/pub_playground.git'
+            # curl http://169.254.169.254/latest/dynamic/instance-identity/document | grep availabilityZone | cut -d \" -f 4 | sed 's/.$//'
+            main() {
+                if [ $(id -u) -ne 0 ]; then
+                    echo "Run script as root!" >&2
+                    exit 1
+                fi
+
+                if [ ! -d "/opt/builders" ] ; then
+                    mkdir /opt/builders
+                fi
+
+                export HOME_DIR="/opt/builders"
+                sleep=0
+                while true; do
+                    get_tags &&
+                    git_init &&
+                    config_set &&
+                    make_service &&
+                    break
+                done
+                echo 'initializing complete !!'
+                exit 0
+            }
+            
+            get_tags() {
+                echo 'Get tags' 
+                query="Reservations[*].Instances[*].[Tags[?Key=='service_name'].Value | [0]]"
+                export service_name=`aws ec2 describe-instances --instance-id $INSTANCE_ID --region $REGION --query "$query" --out text`
+                echo 'Tag name "service_name" is,' && echo "$service_name"
+            }
+            
+            git_init(){
+                echo '>> git init step'
+                yum install git -y
+                cd $HOME_DIR
+                if [ -d $HOME_DIR/builders_pkg ] ; then
+                    echo 'remove old git info'
+                    rm -rf $HOME_DIR/builders_pkg
+                fi
+                git init builders_pkg
+                cd builders_pkg
+                git config core.sparseCheckout true
+                git remote add -f origin $REPO
+                echo "python_app/$service_name" > .git/info/sparse-checkout
+                git pull origin main
+                echo '>> end git init'
+            }
+            
+            config_set(){
+               echo '>>config set step'
+               if [ ! -d $HOME_DIR/builders_pkg/python_app/$service_name ] ; then
+                    echo "git init failed"
+                    exit 1
+                fi
+            
+                cd $HOME_DIR/builders_pkg/python_app/$service_name
+                echo '>>working directory is,' && echo `pwd`
+                cat configs.json.tpl | sed "s/REGION_CODE/$REGION/g" > configs.json
+                echo '>> configs.json file ....'
+                cat configs.json
+                echo 'end config set step'
+            }
+
+            make_service(){
+                if [ ! -d $HOME_DIR/builders_pkg/python_app/$service_name ] ; then
+                    echo "git init failed"
+                    exit 1
+                fi
+            
+                cd $HOME_DIR
+                service_file=$HOME_DIR/buildersApp.service.tpl
+                echo '[Unit]' > $service_file
+                echo 'Description=Builders Micro Service' >> $service_file
+                echo -e '\n' >> $service_file
+                echo '[Service]' >> $service_file
+                echo "ExecStart=$HOME_DIR/builders_pkg/python_app/$service_name/start.sh" >> $service_file
+                echo "WorkingDirectory=$HOME_DIR/builders_pkg/python_app/$service_name" >> $service_file
+                echo -e '\n' >> $service_file
+                echo '[Install]' >> $service_file
+                echo 'WantedBy=multi-user.target' >> $service_file
+                
+                echo 'Qualification...'
+                cat $service_file
+            
+                cp $service_file /etc/systemd/system/buildersApp.service
+                systemctl daemon-reload
+                systemctl enable buildersApp
+                systemctl start buildersApp
+            
+            }
+            
+            main
+
+  BkDogLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn: FrontEndSecurityGroup 
+    Properties:
+      LaunchTemplateName: BuildersBackendDog
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            DeleteOnTermination: 'true'
+            VolumeSize: 8
+            VolumeType: gp3
+        IamInstanceProfile: 
+          Name: !Ref EC2InstanceProfile 
+        ImageId: ami-033a6a056910d1137 
+        InstanceType: t3.micro
+        SecurityGroupIds:
+        - !Ref BackEndSecurityGroup 
+        TagSpecifications:
+        - ResourceType: instance
+          Tags:
+          - Key: Name
+            Value: Builders-Backend-Dog
+          - Key: service_name
+            Value: dogs
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -e
+            echo 'get temporary token for metedata'
+            TOKEN=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+            echo ''
+            echo '>> Get Region ....'
+            export REGION=`curl -s -H "X-aws-ec2-metadata-token: $TOKEN"  http://169.254.169.254/latest/dynamic/instance-identity/document/ | grep region | cut -d \" -f 4`
+            echo $REGION && echo ''
+            echo '>> Get instance id ....'
+            INSTANCE_ID=`curl -s -H "X-aws-ec2-metadata-token: $TOKEN"  http://169.254.169.254/latest/dynamic/instance-identity/document/ | grep instanceId | cut -d \" -f 4`
+            echo $INSTANCE_ID && echo ''
+            REPO='https://github.com/John1Q84/pub_playground.git'
+            # curl http://169.254.169.254/latest/dynamic/instance-identity/document | grep availabilityZone | cut -d \" -f 4 | sed 's/.$//'
+            main() {
+                if [ $(id -u) -ne 0 ]; then
+                    echo "Run script as root!" >&2
+                    exit 1
+                fi
+
+                if [ ! -d "/opt/builders" ] ; then
+                    mkdir /opt/builders
+                fi
+
+                export HOME_DIR="/opt/builders"
+                sleep=0
+                while true; do
+                    get_tags &&
+                    git_init &&
+                    config_set &&
+                    make_service &&
+                    break
+                done
+                echo 'initializing complete !!'
+                exit 0
+            }
+            
+            get_tags() {
+                echo 'Get tags' 
+                query="Reservations[*].Instances[*].[Tags[?Key=='service_name'].Value | [0]]"
+                export service_name=`aws ec2 describe-instances --instance-id $INSTANCE_ID --region $REGION --query "$query" --out text`
+                echo 'Tag name "service_name" is,' && echo "$service_name"
+            }
+            
+            git_init(){
+                echo '>> git init step'
+                yum install git -y
+                cd $HOME_DIR
+                if [ -d $HOME_DIR/builders_pkg ] ; then
+                    echo 'remove old git info'
+                    rm -rf $HOME_DIR/builders_pkg
+                fi
+                git init builders_pkg
+                cd builders_pkg
+                git config core.sparseCheckout true
+                git remote add -f origin $REPO
+                echo "python_app/$service_name" > .git/info/sparse-checkout
+                git pull origin main
+                echo '>> end git init'
+            }
+            
+            config_set(){
+               echo '>>config set step'
+               if [ ! -d $HOME_DIR/builders_pkg/python_app/$service_name ] ; then
+                    echo "git init failed"
+                    exit 1
+                fi
+            
+                cd $HOME_DIR/builders_pkg/python_app/$service_name
+                echo '>>working directory is,' && echo `pwd`
+                cat configs.json.tpl | sed "s/REGION_CODE/$REGION/g" > configs.json
+                echo '>> configs.json file ....'
+                cat configs.json
+                echo 'end config set step'
+            }
+
+            make_service(){
+                if [ ! -d $HOME_DIR/builders_pkg/python_app/$service_name ] ; then
+                    echo "git init failed"
+                    exit 1
+                fi
+            
+                cd $HOME_DIR
+                service_file=$HOME_DIR/buildersApp.service.tpl
+                echo '[Unit]' > $service_file
+                echo 'Description=Builders Micro Service' >> $service_file
+                echo -e '\n' >> $service_file
+                echo '[Service]' >> $service_file
+                echo "ExecStart=$HOME_DIR/builders_pkg/python_app/$service_name/start.sh" >> $service_file
+                echo "WorkingDirectory=$HOME_DIR/builders_pkg/python_app/$service_name" >> $service_file
+                echo -e '\n' >> $service_file
+                echo '[Install]' >> $service_file
+                echo 'WantedBy=multi-user.target' >> $service_file
+                
+                echo 'Qualification...'
+                cat $service_file
+            
+                cp $service_file /etc/systemd/system/buildersApp.service
+                systemctl daemon-reload
+                systemctl enable buildersApp
+                systemctl start buildersApp
+            
+            }
+            
+            main
+
+  FrontendASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: Builders-FrontendASG
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Cooldown: 10
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref FrontendLaunchTemplate
+        Version: !GetAtt FrontendLaunchTemplate.LatestVersionNumber 
+      MaxSize: 2
+      MinSize: 1
+      DesiredCapacity: 1
+      HealthCheckGracePeriod: 30
+      TargetGroupARNs:
+        - !Ref FrontendALBTargetGroup   
+      Tags:
+        - Key: Name
+          Value: Builders-Frontend
+          PropagateAtLaunch: true
+        - Key: service_name
+          Value: frontend
+          PropagateAtLaunch: true
+
+  BkCatASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: Builders-BeckendCatASG
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Cooldown: 10
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref BkCatLaunchTemplate
+        Version: !GetAtt BkCatLaunchTemplate.LatestVersionNumber
+      MaxSize: 2
+      MinSize: 1
+      DesiredCapacity: 1
+      HealthCheckGracePeriod: 30
+      TargetGroupARNs:
+        - !Ref BkCatALBTargetGroup   
+      Tags:
+        - Key: Name
+          Value: Builders-Backend-cat
+          PropagateAtLaunch: true
+        - Key: service_name
+          Value: cats
+          PropagateAtLaunch: true
+
+  BkDogASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: Builders-BeckendDogASG
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Cooldown: 10
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref BkDogLaunchTemplate
+        Version: !GetAtt BkDogLaunchTemplate.LatestVersionNumber 
+      MaxSize: 2
+      MinSize: 1
+      DesiredCapacity: 1
+      HealthCheckGracePeriod: 30
+      TargetGroupARNs:
+        - !Ref BkDogALBTargetGroup   
+      Tags:
+        - Key: Name
+          Value: Builders-Backend-dog
+          PropagateAtLaunch: true
+        - Key: service_name
+          Value: dogs
+          PropagateAtLaunch: true
+
+
+  R53HostedZone:
+    Type: AWS::Route53::HostedZone
+    DependsOn: VPC
+    Properties:
+      HostedZoneConfig:
+        Comment: 'Builders internal hosted zone'
+      Name: 'mydomain.int'
+      VPCs:
+        - VPCId: !Ref VPC
+          VPCRegion: ap-northeast-2
+
+  ServiceDNSRecord:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref R53HostedZone
+      Comment: Alias record set for backend ALB
+      RecordSets:
+      - Name: service.mydomain.int
+        Type: A
+        SetIdentifier: BkCats alb
+        Weight: '100'
+        AliasTarget:
+          HostedZoneId: !GetAtt BkCatALB.CanonicalHostedZoneID 
+          DNSName:  !GetAtt BkCatALB.DNSName 
+      - Name: service.mydomain.int
+        Type: A
+        SetIdentifier: BkDogs alb 
+        Weight: '0'
+        AliasTarget:
+          HostedZoneId: !GetAtt BkDogALB.CanonicalHostedZoneID 
+          DNSName:  !GetAtt BkDogALB.DNSName 
+
+
+
+
